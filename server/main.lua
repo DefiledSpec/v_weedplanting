@@ -9,8 +9,13 @@ RegisterNetEvent('v_weedplanting:server:plantWeed', function(name, coords)
 end);
 
 lib.callback.register('v_weedplanting:getPlants', function(source)
-    local plants =  GetAllPlants();
-    print('plants', json.encode(plants))
+    local results = GetAllPlants();
+    print('results', json.encode(results))
+    local plants = {};
+    for i, plant in pairs(results) do
+        plants[plant.id] = plant;
+    end
+
     return plants;
 end);
 

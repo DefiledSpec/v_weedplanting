@@ -63,7 +63,6 @@ local function refreshPlants()
     for k, plant in pairs(plants) do
         -- print('test', json.encode(plant, {indent = true}))
         if #(playerCoords - vector3(plant.coords.x, plant.coords.y, plant.coords.z)) <= shared.proximityDistance and not spawnedPlants[plant.id] then
-            -- despawnPlant(plant.handle)
             local model = plant.data.stages[plant.stage];
             local handle = placePlant(model, plant.coords);
 
@@ -82,7 +81,6 @@ local function refreshPlants()
 end
 
 RegisterNetEvent('v_weedplanting:client:plantWeed', function(plant)
-    -- table.insert(plants, plant);
     plants[plant.id] = plant;
     local playerCoords = GetEntityCoords(cache.ped);
 
@@ -94,7 +92,6 @@ RegisterNetEvent('v_weedplanting:client:plantWeed', function(plant)
         data.handle = handle;
         data.model = model;
 
-        -- table.insert(spawnedPlants, data);
         spawnedPlants[data.id] = data;
     end
 end)
