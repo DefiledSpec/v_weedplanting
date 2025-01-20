@@ -17,7 +17,7 @@ local function addTargetOptions(handle, plant)
         {
             label = 'Check Status',
             name = ('water_plant_%d'):format(plant.id),
-            distance = 10,
+            distance = 1.5,
             onSelect = function()
                 local plantData = plants?[plant.id];
                 lib.notify({
@@ -30,7 +30,7 @@ local function addTargetOptions(handle, plant)
         {
             label = 'Water',
             name = ('water_plant_%d'):format(plant.id),
-            distance = 10,
+            distance = 1.5,
             canInteract = function()
                 local plantData = plants?[plant.id];
                 if plantData.water >= 100 or plantData.dead then return false end
@@ -43,17 +43,17 @@ local function addTargetOptions(handle, plant)
                 local input = lib.inputDialog('How much water would you like to use?', {
                     { type = 'slider', required = true, min = 1, max = 100 - plantData.water }
                 });
-                if lib.progressBar({
-                    duration = config.waterDuration,
-                    label = 'Watering plant...',
-                    canCancel = true,
-                    anim = config.waterAnim,
-                    disable = {
-                        move = true,
-                        combat = true,
-                    }
-                }) then
-                    if input[1] then
+                if input?[1] then
+                    if lib.progressBar({
+                        duration = config.waterDuration,
+                        label = 'Watering plant...',
+                        canCancel = true,
+                        anim = config.waterAnim,
+                        disable = {
+                            move = true,
+                            combat = true,
+                        }
+                    }) then
                         local water = math.min(plantData.water + input[1], 100);
                         local updated = lib.callback.await('v_weedplanting:waterPlant', false, plantData.id, water);
                         if updated then
@@ -72,7 +72,7 @@ local function addTargetOptions(handle, plant)
         {
             label = 'Harvest',
             name = ('harvest_plant_%d'):format(plant.id),
-            distance = 10,
+            distance = 1.5,
             canInteract = function()
                 local plantData = plants?[plant.id];
                 return plantData.harvestable or plantData.dead;
@@ -148,7 +148,6 @@ local function refreshPlants()
 
     for k, plant in pairs(plants) do
         if #(playerCoords - vector3(plant.coords.x, plant.coords.y, plant.coords.z)) <= config.renderDistance then
-        --  and not spawnedPlants?[plant.id] 
             local model = plant.data.stages[plant.stage];
             if spawnedPlants?[plant.id] then
                 if model ~= spawnedPlants[plant.id].model then
@@ -221,7 +220,7 @@ end)
 
 function PlantWeed(strain)
     local ped = PlayerPedId();
-    local offset = GetOffsetFromEntityInWorldCoords(ped, 0.0, 1.0, 0.0);
+    local offset = GetOffsetFromEntityInWorldCoords(ped, 0.0, 0.5, 0.0);
 
     TriggerServerEvent('v_weedplanting:server:plantWeed', strain, offset);
 end
@@ -231,61 +230,63 @@ CreateThread(function()
     plants = lib.callback.await('v_weedplanting:getPlants', false);
     while(true) do
         refreshPlants();
-        Wait(2500);
+        Wait(config.plantUpdateInterval);
     end
 end)
 
--- DEV COMMANDS
-RegisterCommand('plant', function(_, args)
-    local plant = 'prodigy_purp';
-    if args and args[1] then plant = args[1]; end
+if shared.debug then
+    -- DEV COMMANDS
+    RegisterCommand('plant', function(_, args)
+        local plant = 'prodigy_purp';
+        if args and args[1] then plant = args[1]; end
 
-    PlantWeed(plant);
-end, false);
+        PlantWeed(plant);
+    end, false);
 
-RegisterCommand('water', function(_, args)
-    local id = 1;
-    local water = 0;
-    if args and args[1] then id = tonumber(args[1]); end
-    if args and args[2] then water = tonumber(args[2]); end
+    RegisterCommand('water', function(_, args)
+        local id = 1;
+        local water = 0;
+        if args and args[1] then id = tonumber(args[1]); end
+        if args and args[2] then water = tonumber(args[2]); end
 
-    local plantData = plants?[id];
-    if not plantData then return print('no plant', plantData, id) end
+        local plantData = plants?[id];
+        if not plantData then return print('no plant', plantData, id) end
 
-    local update = math.min(plantData.water + water, 100);
-    local updated = lib.callback.await('v_weedplanting:waterPlant', false, plantData.id, update);
-    if updated then
-        plants[id].water = update;
-    end
-    print('updated water ' .. update, updated)
-    lib.notify({
-        description = ('Humidity %d'):format(water)..'%',
-        type = 'success',
-        icon = 'fa-cannabis'
-    });
-end, false);
-
-RegisterCommand('listplants', function(_, args)
-    print('plants', json.encode(plants, { indent = true }));
-    print('spawnedPlants', json.encode(spawnedPlants, { indent = true }));
-end, false);
-
-
-RegisterCommand('debugstages', function(_, args)
-    local ped = PlayerPedId();
-    local coords = GetOffsetFromEntityInWorldCoords(ped, 0.0, 1.0, 0.0);
-    for i, stage in pairs(shared.plants.prodigy_purp.stages) do
-        local plant = CreateObject(joaat(stage), coords.x, coords.y, coords.z, false, false, false);
-
-        while not plant do
-            Wait(0);
+        local update = math.min(plantData.water + water, 100);
+        local updated = lib.callback.await('v_weedplanting:waterPlant', false, plantData.id, update);
+        if updated then
+            plants[id].water = update;
         end
+        print('updated water ' .. update, updated)
+        lib.notify({
+            description = ('Humidity %d'):format(water)..'%',
+            type = 'success',
+            icon = 'fa-cannabis'
+        });
+    end, false);
 
-        PlaceObjectOnGroundProperly(plant);
-        Wait(10)
-        FreezeEntityPosition(plant, true);
-        SetEntityAsMissionEntity(plant, false, false);
+    RegisterCommand('listplants', function(_, args)
+        print('plants', json.encode(plants, { indent = true }));
+        print('spawnedPlants', json.encode(spawnedPlants, { indent = true }));
+    end, false);
 
-        coords = vector3(coords.x + 1.5, coords.y, coords.z);
-    end
-end, false);
+
+    RegisterCommand('debugstages', function(_, args)
+        local ped = PlayerPedId();
+        local coords = GetOffsetFromEntityInWorldCoords(ped, 0.0, 1.0, 0.0);
+        for i, stage in pairs(shared.plants.prodigy_purp.stages) do
+            local plant = CreateObject(joaat(stage), coords.x, coords.y, coords.z, false, false, false);
+
+            while not plant do
+                Wait(0);
+            end
+
+            PlaceObjectOnGroundProperly(plant);
+            Wait(10)
+            FreezeEntityPosition(plant, true);
+            SetEntityAsMissionEntity(plant, false, false);
+
+            coords = vector3(coords.x + 1.5, coords.y, coords.z);
+        end
+    end, false);
+end

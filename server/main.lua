@@ -37,7 +37,7 @@ lib.callback.register('v_weedplanting:harvestPlant', function (source, id)
         DeletePlantById(id);
         success = true;
     end
-    
+
     return success;
 end);
 

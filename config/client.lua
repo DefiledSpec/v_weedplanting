@@ -10,4 +10,5 @@ return {
         clip = 'andy_ig_1_p12_wearegoingtobeharvested_1',
     },
     harvestDuration = 2500,
+    plantUpdateInterval = 2000 --2500,
 }

@@ -1,7 +1,7 @@
-exports('plant_weed', function(data, slot)
-    exports.ox_inventory:useItem(data, function(data)
+exports('plant_weed', function(item, slot)
+    exports.ox_inventory:useItem(item, function(data)
         if data then
-            PlantWeed(data.name);
+            PlantWeed(item.name);
         end
     end)
 end);
