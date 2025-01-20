@@ -2,10 +2,7 @@ local shared = require 'config.shared';
 
 local plants = {};
 local spawnedPlants = {};
-
-local function addTargetOptions(handle, plant)
-
-end
+local targets = {};
 
 local function deletePlant(model, coords)
     if not model or not coords then return end
@@ -14,12 +11,76 @@ local function deletePlant(model, coords)
     DeleteObject(closest);
 end
 
+local function addTargetOptions(handle, plant)
+    local options = {
+        {
+            label = 'Check Status',
+            name = ('water_plant_%d'):format(plant.id),
+            distance = 10,
+            onSelect = function()
+                local plantData = plants?[plant.id];
+                exports.qbx_core:Notify(('Humidity: %d\nHealth: %d\nStage: %d/%d\nStrain: %s'):format(plantData.water, plantData.health, plantData.stage, #plantData.data.stages, plantData.data.label))
+            end,
+        },
+        {
+            label = 'Water',
+            name = ('water_plant_%d'):format(plant.id),
+            distance = 10,
+            canInteract = function()
+                local plantData = plants?[plant.id];
+                if plantData.water >= 100 or plantData.dead then return false end
+                return true;
+            end,
+            onSelect = function()
+                local plantData = plants?[plant.id];
+                if plantData.water >= 100 or plantData.dead then return end
+                if not plantData then return print('no plant', plantData, plant.id) end
+
+                local water = math.min(plantData.water + 20, 100);
+                local updated = lib.callback.await('v_weedplanting:waterPlant', false, plantData.id, water);
+                if updated then
+                    plants[plantData.id].water = water;
+                    exports.qbx_core:Notify('Watered plant. Humidity: ' .. water);
+                end
+            end,
+        },
+        {
+            label = 'Harvest',
+            name = ('harvest_plant_%d'):format(plant.id),
+            distance = 10,
+            canInteract = function()
+                local plantData = plants?[plant.id];
+                return plantData.harvestable or plantData.dead;
+            end,
+            onSelect = function()
+                local plantData = plants?[plant.id];
+                if plantData.harvestable or plantData.dead then
+                    local success = lib.callback.await('v_weedplanting:harvestPlant', false, plant.id);
+                    if success then
+                        deletePlant(plant.model, plant.coords);
+                    end
+                end
+            end,
+        },
+    };
+    if shared.debug then
+        table.insert(options, {
+            label = 'DEBUG (' .. plant.id .. ')',
+            name = ('debug_plant_%d'):format(plant.id),
+            distance = 10,
+            onSelect = function(one)
+                print(json.encode(plant, { indent = true }));
+            end,
+        });
+    end
+    local target = exports.ox_target:addLocalEntity(handle, options);
+    table.insert(targets, { handle = handle, target = target });
+end
+
 local function placePlant(model, coords)
     local plant = CreateObject(joaat(model), coords.x, coords.y, coords.z, false, false, false);
 
-    while not plant do
-        Wait(0);
-    end
+    while not plant do Wait(0) end
 
     PlaceObjectOnGroundProperly(plant);
     Wait(10)
@@ -47,7 +108,6 @@ end
 
 
 local function refreshPlants()
-    print('refreshing plants')
     local playerCoords = GetEntityCoords(cache.ped);
     for id, spawned in pairs(spawnedPlants) do
         if #(playerCoords - vector3(spawned.coords.x, spawned.coords.y, spawned.coords.z)) > shared.proximityDistance then
@@ -63,6 +123,7 @@ local function refreshPlants()
                 local data = plant;
                 data.handle = handle;
                 data.model = model;
+                addTargetOptions(data.handle, data);
 
                 spawnedPlants[data.id] = data;
             end
@@ -70,7 +131,6 @@ local function refreshPlants()
     end
 
     for k, plant in pairs(plants) do
-        -- print('test', json.encode(plant, {indent = true}))
         if #(playerCoords - vector3(plant.coords.x, plant.coords.y, plant.coords.z)) <= shared.proximityDistance and not spawnedPlants?[plant.id] then
             local model = plant.data.stages[plant.stage];
             local handle = placePlant(model, plant.coords);
@@ -78,12 +138,10 @@ local function refreshPlants()
             local data = plant;
             data.handle = handle;
             data.model = model;
+            addTargetOptions(data.handle, data);
 
             spawnedPlants[data.id] = data;
         end
-    end
-    for i, plant in pairs(spawnedPlants) do
-        addTargetOptions(plant.handle, plant);
     end
 end
 
@@ -98,6 +156,7 @@ RegisterNetEvent('v_weedplanting:client:plantWeed', function(plant)
         local data = plant;
         data.handle = handle;
         data.model = model;
+        addTargetOptions(data.handle, data);
 
         spawnedPlants[data.id] = data;
     end
@@ -111,17 +170,34 @@ end)
 
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() then return end
+    for key, value in pairs(targets) do
+        exports.ox_target:removeLocalEntity(value.handle, value.target);
+    end
     despawnPlants();
 end)
 
+function PlantWeed(strain)
+    local ped = PlayerPedId();
+    local offset = GetOffsetFromEntityInWorldCoords(ped, 0.0, 1.0, 0.0);
+
+    TriggerServerEvent('v_weedplanting:server:plantWeed', strain, offset);
+end
+exports('PlantWeed', PlantWeed);
+
+CreateThread(function()
+    plants = lib.callback.await('v_weedplanting:getPlants', false);
+    while(true) do
+        refreshPlants();
+        Wait(2500);
+    end
+end)
+
+-- DEV COMMANDS
 RegisterCommand('plant', function(_, args)
     local plant = 'prodigy_purp';
     if args and args[1] then plant = args[1]; end
 
-    local ped = PlayerPedId();
-    local offset = GetOffsetFromEntityInWorldCoords(ped, 0, 1, 0);
-
-    TriggerServerEvent('v_weedplanting:server:plantWeed', plant, offset);
+    PlantWeed(plant);
 end, false);
 
 RegisterCommand('water', function(_, args)
@@ -130,8 +206,6 @@ RegisterCommand('water', function(_, args)
     if args and args[1] then id = tonumber(args[1]); end
     if args and args[2] then water = tonumber(args[2]); end
 
-    local ped = PlayerPedId();
-    local offset = GetOffsetFromEntityInWorldCoords(ped, 0, 1, 0);
     local plantData = plants?[id];
     if not plantData then return print('no plant', plantData, id) end
 
@@ -149,28 +223,22 @@ RegisterCommand('listplants', function(_, args)
     print('spawnedPlants', json.encode(spawnedPlants, { indent = true }));
 end, false);
 
-CreateThread(function()
-    plants = lib.callback.await('v_weedplanting:getPlants', false);
-    while(true) do
-        refreshPlants();
-        Wait(5000);
+
+RegisterCommand('debugstages', function(_, args)
+    local ped = PlayerPedId();
+    local coords = GetOffsetFromEntityInWorldCoords(ped, 0.0, 1.0, 0.0);
+    for i, stage in pairs(shared.plants.prodigy_purp.stages) do
+        local plant = CreateObject(joaat(stage), coords.x, coords.y, coords.z, false, false, false);
+
+        while not plant do
+            Wait(0);
+        end
+
+        PlaceObjectOnGroundProperly(plant);
+        Wait(10)
+        FreezeEntityPosition(plant, true);
+        SetEntityAsMissionEntity(plant, false, false);
+
+        coords = vector3(coords.x + 1.5, coords.y, coords.z);
     end
-end)
-
--- CreateThread(function()
---     for i, stage in pairs(shared.plants.prodigy_purp.stageProps) do
---         local plant = CreateObject(joaat(stage), test.x, test.y, test.z, false, false, false);
-
---         while not plant do
---             Wait(0);
---         end
-
---         PlaceObjectOnGroundProperly(plant);
---         Wait(10)
---         FreezeEntityPosition(plant, true);
---         SetEntityAsMissionEntity(plant, false, false);
-
---         test = vector3(test.x + 2, 1498.66, 113.61);
---     end
---     print('plants', json.encode(plants, { indent = true }));
--- end)
+end, false);
