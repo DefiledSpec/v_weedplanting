@@ -145,15 +145,24 @@ end
 
 local function refreshPlants()
     local playerCoords = GetEntityCoords(cache.ped);
-    for id, spawned in pairs(spawnedPlants) do
-        if #(playerCoords - vector3(spawned.coords.x, spawned.coords.y, spawned.coords.z)) > shared.proximityDistance then
-            despawnPlant(spawned.handle);
-            spawnedPlants[id] = nil;
-        else
-            local plant = plants?[id];
-            if plant and spawned.model ~= plant.data.stages[plant.stage] then
-                despawnPlant(spawned.handle);
-                local model = plant.data.stages[plant.stage];
+
+    for k, plant in pairs(plants) do
+        if #(playerCoords - vector3(plant.coords.x, plant.coords.y, plant.coords.z)) <= config.renderDistance then
+        --  and not spawnedPlants?[plant.id] 
+            local model = plant.data.stages[plant.stage];
+            if spawnedPlants?[plant.id] then
+                if model ~= spawnedPlants[plant.id].model then
+                    despawnPlant(spawnedPlants[plant.id].handle);
+                    local handle = placePlant(model, plant.coords);
+
+                    local data = plant;
+                    data.handle = handle;
+                    data.model = model;
+                    addTargetOptions(data.handle, data);
+
+                    spawnedPlants[data.id] = data;
+                end
+            else
                 local handle = placePlant(model, plant.coords);
 
                 local data = plant;
@@ -163,20 +172,18 @@ local function refreshPlants()
 
                 spawnedPlants[data.id] = data;
             end
+        else
+            if spawnedPlants?[plant.id] then
+                despawnPlant(spawnedPlants[plant.id].handle);
+                spawnedPlants[plant.id] = nil;
+            end
         end
     end
-
-    for k, plant in pairs(plants) do
-        if #(playerCoords - vector3(plant.coords.x, plant.coords.y, plant.coords.z)) <= shared.proximityDistance and not spawnedPlants?[plant.id] then
-            local model = plant.data.stages[plant.stage];
-            local handle = placePlant(model, plant.coords);
-
-            local data = plant;
-            data.handle = handle;
-            data.model = model;
-            addTargetOptions(data.handle, data);
-
-            spawnedPlants[data.id] = data;
+    for id, spawned in pairs(spawnedPlants) do
+        -- cleanup any plants that were in spawned but not in plants anymore
+        if not plants[id] then
+            despawnPlant(spawned.handle);
+            spawnedPlants[id] = nil;
         end
     end
 end
@@ -185,7 +192,7 @@ RegisterNetEvent('v_weedplanting:client:plantWeed', function(plant)
     plants[plant.id] = plant;
     local playerCoords = GetEntityCoords(cache.ped);
 
-    if #(playerCoords - vector3(plant.coords.x, plant.coords.y, plant.coords.z)) < shared.proximityDistance then
+    if #(playerCoords - vector3(plant.coords.x, plant.coords.y, plant.coords.z)) < config.renderDistance then
         local model = plant.data.stages[plant.stage];
         local handle = placePlant(model, plant.coords);
 

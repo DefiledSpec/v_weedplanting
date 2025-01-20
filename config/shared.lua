@@ -1,6 +1,5 @@
 return {
     debug = true,
-    proximityDistance = 20,
     plants = {
         prodigy_purp = {
             label = 'Prodigy Purple',

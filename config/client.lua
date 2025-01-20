@@ -1,4 +1,5 @@
 return {
+    renderDistance = 20,
     waterAnim = {
         dict = 'weapon@w_sp_jerrycan',
         clip = 'fire',
