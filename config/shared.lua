@@ -3,8 +3,12 @@ return {
     proximityDistance = 20,
     plants = {
         prodigy_purp = {
-            item = 'weed_prodigy',
             label = 'Prodigy Purple',
+            reward = {
+                item = 'weed_prodigy',
+                min = 4,
+                max = 8,
+            },
             targetWater = {
                 min = 60,
                 max = 80,
@@ -17,8 +21,8 @@ return {
             },
             stages = {
                 'bkr_prop_weed_01_small_01c',
-                'bkr_prop_weed_01_small_01b',
                 'bkr_prop_weed_01_small_01a',
+                'bkr_prop_weed_01_small_01b',
                 'bkr_prop_weed_med_01b',
                 'bkr_prop_weed_lrg_01a',
                 'bkr_prop_weed_lrg_01b',

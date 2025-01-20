@@ -20,6 +20,17 @@ function GetWeedPlantById(id)
     return plant;
 end
 
+function DeletePlantById(id)
+    local plant = MySQL.single.await([[
+        DELETE FROM `v_weed_plants` WHERE id = :id
+    ]], { id = id });
+    if plant then
+        plant.data = json.decode(plant.data);
+        plant.coords = json.decode(plant.coords);
+    end
+    return plant;
+end
+
 function UpdatePlantWater(id, water)
     local updated = MySQL.update.await([[
         UPDATE `v_weed_plants`

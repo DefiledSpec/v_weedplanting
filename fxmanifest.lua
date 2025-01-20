@@ -10,12 +10,15 @@ lua54 'yes'
 client_scripts {
 	'@qbx_core/modules/playerdata.lua',
 	'client/**',
+	'framework/items.lua',
 }
 
 server_scripts {
 	'@oxmysql/lib/MySQL.lua',
 	'server/**',
-	'framework/db.lua'
+	'config/server.lua',
+	'framework/db.lua',
+	'framework/bridge.lua',
 }
 
 shared_scripts {

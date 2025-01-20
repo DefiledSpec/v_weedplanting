@@ -1,14 +1,15 @@
 return {
+    updateRate = '* * * * *',
     growProgress = {
-        min = 5,
-        max = 5,
+        min = 25,
+        max = 50,
     },
     targetBonus = {
         min = 10,
         max = 20,
     },
     waterUsage = {
-        min = 10,
+        min = 1,
         max = 10,
     },
     destroyPlantIfDry = true,
@@ -16,4 +17,9 @@ return {
         min = 20,
         max = 30,
     },
+    rewardDead = {
+        item = 'soil',
+        min = 2,
+        max = 4,
+    }
 }
