@@ -1,4 +1,5 @@
 local shared = require 'config.shared';
+local config = require 'config.client';
 
 local plants = {};
 local spawnedPlants = {};
@@ -19,7 +20,11 @@ local function addTargetOptions(handle, plant)
             distance = 10,
             onSelect = function()
                 local plantData = plants?[plant.id];
-                exports.qbx_core:Notify(('Humidity: %d\nHealth: %d\nStage: %d/%d\nStrain: %s'):format(plantData.water, plantData.health, plantData.stage, #plantData.data.stages, plantData.data.label))
+                lib.notify({
+                    description = ('Humidity: %d | Health: %d | Stage: %d/%d\nStrain: %s'):format(plantData.water, plantData.health, plantData.stage, #plantData.data.stages, plantData.data.label),
+                    type = 'success',
+                    icon = 'fa-cannabis'
+                });
             end,
         },
         {
@@ -33,14 +38,34 @@ local function addTargetOptions(handle, plant)
             end,
             onSelect = function()
                 local plantData = plants?[plant.id];
-                if plantData.water >= 100 or plantData.dead then return end
                 if not plantData then return print('no plant', plantData, plant.id) end
-
-                local water = math.min(plantData.water + 20, 100);
-                local updated = lib.callback.await('v_weedplanting:waterPlant', false, plantData.id, water);
-                if updated then
-                    plants[plantData.id].water = water;
-                    exports.qbx_core:Notify('Watered plant. Humidity: ' .. water);
+                if plantData.water >= 100 or plantData.dead then return end
+                local input = lib.inputDialog('How much water would you like to use?', {
+                    { type = 'slider', required = true, min = 1, max = 100 - plantData.water }
+                });
+                if lib.progressBar({
+                    duration = config.waterDuration,
+                    label = 'Watering plant...',
+                    canCancel = true,
+                    anim = config.waterAnim,
+                    disable = {
+                        move = true,
+                        combat = true,
+                    }
+                }) then
+                    if input[1] then
+                        local water = math.min(plantData.water + input[1], 100);
+                        local updated = lib.callback.await('v_weedplanting:waterPlant', false, plantData.id, water);
+                        if updated then
+                            plants[plantData.id].water = water;
+                            spawnedPlants[plantData.id].water = water;
+                            lib.notify({
+                                description = ('Humidity %d'):format(water)..'%',
+                                type = 'success',
+                                icon = 'fa-cannabis'
+                            });
+                        end
+                    end
                 end
             end,
         },
@@ -55,9 +80,20 @@ local function addTargetOptions(handle, plant)
             onSelect = function()
                 local plantData = plants?[plant.id];
                 if plantData.harvestable or plantData.dead then
-                    local success = lib.callback.await('v_weedplanting:harvestPlant', false, plant.id);
-                    if success then
-                        deletePlant(plant.model, plant.coords);
+                    if lib.progressBar({
+                        duration = config.harvestDuration,
+                        label = 'Harvesting plant...',
+                        canCancel = true,
+                        anim = config.harvestAnim,
+                        disable = {
+                            move = true,
+                            combat = true,
+                        }
+                    }) then
+                        local success = lib.callback.await('v_weedplanting:harvestPlant', false, plant.id);
+                        if success then
+                            deletePlant(plant.model, plant.coords);
+                        end
                     end
                 end
             end,
@@ -215,7 +251,11 @@ RegisterCommand('water', function(_, args)
         plants[id].water = update;
     end
     print('updated water ' .. update, updated)
-    exports.qbx_core:Notify('updated water ' .. update, updated);
+    lib.notify({
+        description = ('Humidity %d'):format(water)..'%',
+        type = 'success',
+        icon = 'fa-cannabis'
+    });
 end, false);
 
 RegisterCommand('listplants', function(_, args)

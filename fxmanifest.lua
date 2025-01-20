@@ -11,6 +11,7 @@ client_scripts {
 	'@qbx_core/modules/playerdata.lua',
 	'client/**',
 	'framework/items.lua',
+	'config/client.lua',
 }
 
 server_scripts {
