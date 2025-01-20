@@ -10,7 +10,6 @@ end);
 
 lib.callback.register('v_weedplanting:getPlants', function(source)
     local results = GetAllPlants();
-    print('results', json.encode(results))
     local plants = {};
     for i, plant in pairs(results) do
         plants[plant.id] = plant;
@@ -21,13 +20,19 @@ end);
 
 lib.callback.register('v_weedplanting:waterPlant', function (source, id, water)
     local success = UpdatePlantWater(id, water);
+    print('adding water', success, id, water)
     return success;
 end);
 
 lib.cron.new('* * * * *', function()
     local success = UpdateWeedProgress();
     if success then
-        local plants = GetAllPlants();
+        local results = GetAllPlants();
+        local plants = {};
+        for i, plant in pairs(results) do
+            plants[plant.id] = plant;
+        end
+    
         TriggerClientEvent('v_weedplanting:client:updatePlants', -1, plants);
     end
 end, { debug = shared.debug });

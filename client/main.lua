@@ -1,9 +1,7 @@
 local shared = require 'config.shared';
--- local ITEMS = exports.ox_inventory:Items();
 
 local plants = {};
 local spawnedPlants = {};
-local updating = false;
 
 local function addTargetOptions(handle, plant)
 
@@ -50,19 +48,30 @@ end
 
 local function refreshPlants()
     print('refreshing plants')
-    updating = true;
-
     local playerCoords = GetEntityCoords(cache.ped);
     for id, spawned in pairs(spawnedPlants) do
         if #(playerCoords - vector3(spawned.coords.x, spawned.coords.y, spawned.coords.z)) > shared.proximityDistance then
             despawnPlant(spawned.handle);
             spawnedPlants[id] = nil;
+        else
+            local plant = plants?[id];
+            if plant and spawned.model ~= plant.data.stages[plant.stage] then
+                despawnPlant(spawned.handle);
+                local model = plant.data.stages[plant.stage];
+                local handle = placePlant(model, plant.coords);
+
+                local data = plant;
+                data.handle = handle;
+                data.model = model;
+
+                spawnedPlants[data.id] = data;
+            end
         end
     end
-    
+
     for k, plant in pairs(plants) do
         -- print('test', json.encode(plant, {indent = true}))
-        if #(playerCoords - vector3(plant.coords.x, plant.coords.y, plant.coords.z)) <= shared.proximityDistance and not spawnedPlants[plant.id] then
+        if #(playerCoords - vector3(plant.coords.x, plant.coords.y, plant.coords.z)) <= shared.proximityDistance and not spawnedPlants?[plant.id] then
             local model = plant.data.stages[plant.stage];
             local handle = placePlant(model, plant.coords);
 
@@ -70,14 +79,12 @@ local function refreshPlants()
             data.handle = handle;
             data.model = model;
 
-            
             spawnedPlants[data.id] = data;
         end
     end
     for i, plant in pairs(spawnedPlants) do
         addTargetOptions(plant.handle, plant);
     end
-    updating = false;
 end
 
 RegisterNetEvent('v_weedplanting:client:plantWeed', function(plant)
@@ -109,9 +116,7 @@ end)
 
 RegisterCommand('plant', function(_, args)
     local plant = 'prodigy_purp';
-    if args and args[1] and table.contains({
-        'prodigy_purp',
-    }, args[1]) then plant = args[1]; end
+    if args and args[1] then plant = args[1]; end
 
     local ped = PlayerPedId();
     local offset = GetOffsetFromEntityInWorldCoords(ped, 0, 1, 0);
@@ -128,21 +133,21 @@ RegisterCommand('water', function(_, args)
     local ped = PlayerPedId();
     local offset = GetOffsetFromEntityInWorldCoords(ped, 0, 1, 0);
     local plantData = plants?[id];
-    if not plantData then return end
-    -- local plant = GetClosestObjectOfType(plantData.coords.x, plantData.coords.y, plantData.coords.z, 3.5, plantData.model, false, false, false)
-    SetEntityDrawOutlineColor(0, 0, 255, 1);
-    SetEntityDrawOutlineShader(1);
-    SetEntityDrawOutline(plantData.handle, true);
+    if not plantData then return print('no plant', plantData, id) end
+
     local update = math.min(plantData.water + water, 100);
     local updated = lib.callback.await('v_weedplanting:waterPlant', false, plantData.id, update);
-    exports.qbx_core:Notify('updated water ' .. update);
+    if updated then
+        plants[id].water = update;
+    end
+    print('updated water ' .. update, updated)
+    exports.qbx_core:Notify('updated water ' .. update, updated);
 end, false);
 
 RegisterCommand('listplants', function(_, args)
     print('plants', json.encode(plants, { indent = true }));
     print('spawnedPlants', json.encode(spawnedPlants, { indent = true }));
 end, false);
-
 
 CreateThread(function()
     plants = lib.callback.await('v_weedplanting:getPlants', false);
@@ -151,7 +156,6 @@ CreateThread(function()
         Wait(5000);
     end
 end)
-
 
 -- CreateThread(function()
 --     for i, stage in pairs(shared.plants.prodigy_purp.stageProps) do
@@ -165,12 +169,7 @@ end)
 --         Wait(10)
 --         FreezeEntityPosition(plant, true);
 --         SetEntityAsMissionEntity(plant, false, false);
---         table.insert(plants, {
---             plant = 'Prodigiy Purple',
---             coords = test,
---             model = stage,
---             obj = plant,
---         });
+
 --         test = vector3(test.x + 2, 1498.66, 113.61);
 --     end
 --     print('plants', json.encode(plants, { indent = true }));
