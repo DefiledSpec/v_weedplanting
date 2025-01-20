@@ -20,9 +20,16 @@ local function addTargetOptions(handle, plant)
             distance = 1.5,
             onSelect = function()
                 local plantData = plants?[plant.id];
+                local status = 'success';
+                if plantData.health > 0 and plantData.water > 0 and plantData.water < 50 then
+                    status = 'warning';
+                end
+                if plantData.health == 0 then
+                    status = 'error';
+                end
                 lib.notify({
                     description = ('Humidity: %d | Health: %d | Stage: %d/%d\nStrain: %s'):format(plantData.water, plantData.health, plantData.stage, #plantData.data.stages, plantData.data.label),
-                    type = 'success',
+                    type = status,
                     icon = 'fa-cannabis'
                 });
             end,
